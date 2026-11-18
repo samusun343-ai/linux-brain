@@ -19,6 +19,7 @@
 #include <linux/rtc.h>
 #include <linux/slab.h>
 #include <linux/of_device.h>
+#include <linux/pm_wakeirq.h>
 #include <linux/of.h>
 #include <linux/stmp_device.h>
 #include <linux/stmp3xxx_rtc_wdt.h>
@@ -239,6 +240,8 @@ static int stmp3xxx_rtc_remove(struct platform_device *pdev)
 	if (!rtc_data)
 		return 0;
 
+	dev_pm_clear_wake_irq(&pdev->dev);
+
 	writel(STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
 		rtc_data->io + STMP3XXX_RTC_CTRL + STMP_OFFSET_REG_CLR);
 
@@ -367,6 +370,23 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
 
 	rtc_data->rtc->ops = &stmp3xxx_rtc_ops;
 	rtc_data->rtc->range_max = U32_MAX;
+
+	/*
+	 * The RTC alarm can wake the SoC from suspend (the driver arms
+	 * ALARM_WAKE_EN in PERSISTENT0), but only if the device is
+	 * registered as a wakeup source.  Honour the standard
+	 * "wakeup-source" device tree property for this; the RTC core
+	 * does not do it for us.
+	 */
+	device_init_wakeup(&pdev->dev,
+			   of_property_read_bool(pdev->dev.of_node,
+						 "wakeup-source"));
+	if (device_may_wakeup(&pdev->dev)) {
+		err = dev_pm_set_wake_irq(&pdev->dev, rtc_data->irq_alarm);
+		if (err)
+			dev_warn(&pdev->dev,
+				 "failed to register wake irq: %d\n", err);
+	}
 
 	err = devm_rtc_register_device(rtc_data->rtc);
 	if (err)
