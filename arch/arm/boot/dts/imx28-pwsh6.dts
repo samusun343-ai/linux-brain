@@ -11,6 +11,11 @@
 	compatible = "sharp,pw-sh6", "sharp,brain", "fsl,imx28";
 };
 
+&mxs_rtc {
+	status = "okay";
+	wakeup-source;
+};
+
 &brainlcd {
 	status = "okay";
 
