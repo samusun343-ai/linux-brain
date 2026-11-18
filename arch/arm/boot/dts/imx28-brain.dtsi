@@ -293,12 +293,10 @@
 				pinctrl-0 = <&i2c0_pins_a>;
 				status = "okay";
 
-				sgtl5000: codec@a {
-					compatible = "fsl,sgtl5000";
-					reg = <0x0a>;
+				bu26154: codec@1a {
+					compatible = "rohm,bu26154";
+					reg = <0x1a>;
 					#sound-dai-cells = <0>;
-					VDDA-supply = <&reg_3p3v>;
-					VDDIO-supply = <&reg_3p3v>;
 					clocks = <&saif0>;
 				};
 
@@ -366,11 +364,10 @@
 	};
 
 	sound {
-		compatible = "fsl,imx28-evk-sgtl5000",
-			     "fsl,mxs-audio-sgtl5000";
-		model = "imx28-evk-sgtl5000";
+		compatible = "sharp,mxs-audio-bu26154";
+		model = "mxs-audio-bu26154";
 		saif-controllers = <&saif0 &saif1>;
-		audio-codec = <&sgtl5000>;
+		audio-codec = <&bu26154>;
 	};
 
 	backlight_display: backlight@0 {

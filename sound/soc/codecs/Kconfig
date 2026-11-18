@@ -1473,6 +1473,14 @@ config SND_SOC_SGTL5000
 	tristate "Freescale SGTL5000 CODEC"
 	depends on I2C
 
+config SND_SOC_BU26154
+	tristate "ROHM BU26154 CODEC"
+	depends on I2C
+	help
+	  Say Y or M if you want to add support for the ROHM BU26154
+	  monaural audio codec, e.g. as used in the SHARP Brain series
+	  of electronic dictionaries.
+
 config SND_SOC_SI476X
 	tristate
 
