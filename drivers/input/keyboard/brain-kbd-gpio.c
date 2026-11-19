@@ -37,6 +37,8 @@ struct bk_gpio_data {
 	bool symbol;
 	ulong last_in[7];
 	bool pressed[7][7];
+	/* keycode actually reported for each cell, UINT_MAX if none */
+	unsigned int reported[7][7];
 };
 
 static void bk_gpio_read_keys(struct input_dev *inputdev, ulong* result)
@@ -85,12 +87,36 @@ static void bk_gpio_read_keys(struct input_dev *inputdev, ulong* result)
 	}
 }
 
+/*
+ * The matrix has no diodes, so pressing three corners of a rectangle
+ * makes the fourth corner read as pressed (ghosting). A new press that
+ * completes a rectangle in the raw scan is therefore ambiguous: it may
+ * be a real key or a ghost. Suppress it until the combination changes.
+ */
+static bool bk_is_ghost(bool cur[7][7], int row, int col)
+{
+	int i, j;
+
+	for (i = 0; i < 7; i++) {
+		if (i == row)
+			continue;
+		for (j = 0; j < 7; j++) {
+			if (j == col)
+				continue;
+			if (cur[row][j] && cur[i][col] && cur[i][j])
+				return true;
+		}
+	}
+	return false;
+}
+
 static void bk_gpio_poll(struct input_dev *inputdev)
 {
 	struct bk_gpio_data *kbd = input_get_drvdata(inputdev);
 	struct device *dev = &inputdev->dev;
-	int i, j, bank;
-	ulong in[7], agg;
+	int i, j;
+	ulong in[7];
+	bool cur[7][7];
 
 	bk_gpio_read_keys(inputdev, in);
 
@@ -104,55 +130,57 @@ static void bk_gpio_poll(struct input_dev *inputdev)
 		in[0], in[1], in[2], in[3], in[4], in[5], in[6]
 	);
 
-	agg = 0;
+	for (i = 0; i < 7; i++)
+		for (j = 0; j < 7; j++)
+			cur[i][j] = ((in[j] >> i) & 1) == 0;
+
+	/* Releases first, so state is settled before new presses are
+	 * evaluated (and before the ghost check looks at the matrix). */
 	for (i = 0; i < 7; i++) {
-		agg |= in[i];
+		for (j = 0; j < 7; j++) {
+			if (!kbd->pressed[i][j] || cur[i][j])
+				continue;
+
+			kbd->pressed[i][j] = false;
+
+			if (i == kbd->sym_key_bank && j == kbd->sym_key_num) {
+				kbd->symbol = false;
+			} else if (kbd->reported[i][j] != UINT_MAX) {
+				dev_dbg(dev, "R: %04x\n", kbd->reported[i][j]);
+				input_report_key(inputdev, kbd->reported[i][j], 0);
+				kbd->reported[i][j] = UINT_MAX;
+			}
+		}
 	}
 
 	for (i = 0; i < 7; i++) {
-		bank = 1 << i;
-		if (agg & bank) {
-			for (j = 0; j < 7; j++) {
-				// skip invalid keymap
-				if (kbd->km[i][j] == UINT_MAX) {
-					continue;
-				}
+		for (j = 0; j < 7; j++) {
+			unsigned int code;
 
-				if ((in[j] & bank) == 0) {
-					if (!kbd->pressed[i][j]) {
-						if (i == kbd->sym_key_bank && j == kbd->sym_key_num) {
-							dev_dbg(dev, "symbol\n");
-							kbd->symbol = true;
-						} else {
-							dev_dbg(dev, "P: %04x\n", kbd->km[i][j]);
-							input_report_key(
-								inputdev,
-								kbd->symbol ? kbd->km_symbol[i][j] : kbd->km[i][j],
-								1
-							);
-						}
-					}
-					kbd->pressed[i][j] = true;
-				} else {
-					kbd->pressed[i][j] = false;
-				}
-			}
-		} else {
-			// flush deasserted bank
-			for (j = 0; j < 7; j++) {
-				if (!kbd->pressed[i][j]) {
-					continue;
-				}
-				kbd->pressed[i][j] = false;
+			if (kbd->pressed[i][j] || !cur[i][j])
+				continue;
 
-				if (i == kbd->sym_key_bank && j == kbd->sym_key_num) {
-					kbd->symbol = false;
-				} else {
-					dev_dbg(dev, "R: %04x\n", kbd->km[i][j]);
-					input_report_key(inputdev, kbd->km[i][j], 0);
-					input_report_key(inputdev, kbd->km_symbol[i][j], 0);
-				}
+			kbd->pressed[i][j] = true;
+			kbd->reported[i][j] = UINT_MAX;
+
+			if (i == kbd->sym_key_bank && j == kbd->sym_key_num) {
+				dev_dbg(dev, "symbol\n");
+				kbd->symbol = true;
+				continue;
 			}
+
+			if (bk_is_ghost(cur, i, j)) {
+				dev_dbg(dev, "ghost suppressed at %d %d\n", i, j);
+				continue;
+			}
+
+			code = kbd->symbol ? kbd->km_symbol[i][j] : kbd->km[i][j];
+			if (code == UINT_MAX)
+				continue;
+
+			dev_dbg(dev, "P: %04x\n", code);
+			kbd->reported[i][j] = code;
+			input_report_key(inputdev, code, 1);
 		}
 	}
 
@@ -303,6 +331,7 @@ static int bk_gpio_probe(struct platform_device *pdev)
 	for (i = 0; i < 7; i++) {
 		for (j = 0; j < 7; j++) {
 			kbd->pressed[i][j] = false;
+			kbd->reported[i][j] = UINT_MAX;
 		}
 	}
 
