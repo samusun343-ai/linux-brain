@@ -230,3 +230,15 @@ CONFIG_STRICT_DEVMEM=y
 CONFIG_DEBUG_USER=y
 # CONFIG_RUNTIME_TESTING_MENU is not set
 CONFIG_BLK_DEV_LOOP=y
+# zram as a loadable module: an optional memory booster (mode/setting
+# enables it at runtime), never a design premise. LZO-RLE default
+# compressor (fast on ARMv5 single-core; zstd is not).
+CONFIG_ZSMALLOC=m
+CONFIG_ZRAM=m
+CONFIG_ZRAM_DEF_COMP_LZORLE=y
+CONFIG_ZRAM_DEF_COMP="lzo-rle"
+# Memory-management enablement for the OS-architecture study follow-up:
+# PSI feeds a pressure-driven killer (jetsam/LMKD pattern); MEMCG backs
+# the BASE/SYSTEM/APPLICATION slice budgets. Both measured after build.
+CONFIG_PSI=y
+CONFIG_MEMCG=y
