@@ -162,3 +162,11 @@
 		<1 3 KEY_BRIGHTNESSDOWN>,/* Down */
 		<6 3 KEY_MUTE>;          /* Space */
 };
+
+&power {
+	/* The power button drives the i.MX28 PSWITCH pin; it is not
+	 * part of the keyboard matrix. */
+	pswitch {
+		compatible = "fsl,imx28-pswitch";
+	};
+};
