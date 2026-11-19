@@ -115,8 +115,8 @@ static void bk_gpio_poll(struct input_dev *inputdev)
 	struct bk_gpio_data *kbd = input_get_drvdata(inputdev);
 	struct device *dev = &inputdev->dev;
 	int i, j;
-	ulong in[7];
-	bool cur[7][7];
+	ulong in[7], agg;
+	bool cur[7][7], real[7][7];
 
 	bk_gpio_read_keys(inputdev, in);
 
@@ -130,15 +130,35 @@ static void bk_gpio_poll(struct input_dev *inputdev)
 		in[0], in[1], in[2], in[3], in[4], in[5], in[6]
 	);
 
+	agg = 0;
 	for (i = 0; i < 7; i++)
-		for (j = 0; j < 7; j++)
+		agg |= in[i];
+
+	for (i = 0; i < 7; i++)
+		for (j = 0; j < 7; j++) {
 			cur[i][j] = ((in[j] >> i) & 1) == 0;
+			/*
+			 * The scan drives one column high while every other
+			 * column stays low, and a row is pulled low only by
+			 * a contact in a low column -- so a row bit in in[j]
+			 * is set only by a contact in a column other than
+			 * j, and cur on its own reads pressed at idle
+			 * (in[] == 0).  A cell is really pressed only when
+			 * its bit is clear in its own column's read and its
+			 * row is seen pulled low in some other column's read
+			 * (the agg test the pre-ghost-fix driver used).
+			 * Without it releases never fire: after the first
+			 * key, pressed[] latches for the whole phantom set
+			 * and every later key is swallowed.
+			 */
+			real[i][j] = cur[i][j] && ((agg >> i) & 1);
+		}
 
 	/* Releases first, so state is settled before new presses are
 	 * evaluated (and before the ghost check looks at the matrix). */
 	for (i = 0; i < 7; i++) {
 		for (j = 0; j < 7; j++) {
-			if (!kbd->pressed[i][j] || cur[i][j])
+			if (!kbd->pressed[i][j] || real[i][j])
 				continue;
 
 			kbd->pressed[i][j] = false;
@@ -157,14 +177,12 @@ static void bk_gpio_poll(struct input_dev *inputdev)
 		for (j = 0; j < 7; j++) {
 			unsigned int code;
 
-			if (kbd->pressed[i][j] || !cur[i][j])
+			if (kbd->pressed[i][j] || !real[i][j])
 				continue;
-
-			kbd->pressed[i][j] = true;
-			kbd->reported[i][j] = UINT_MAX;
 
 			if (i == kbd->sym_key_bank && j == kbd->sym_key_num) {
 				dev_dbg(dev, "symbol\n");
+				kbd->pressed[i][j] = true;
 				kbd->symbol = true;
 				continue;
 			}
@@ -179,6 +197,7 @@ static void bk_gpio_poll(struct input_dev *inputdev)
 				continue;
 
 			dev_dbg(dev, "P: %04x\n", code);
+			kbd->pressed[i][j] = true;
 			kbd->reported[i][j] = code;
 			input_report_key(inputdev, code, 1);
 		}
