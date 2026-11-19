@@ -16,6 +16,16 @@
 	wakeup-source;
 };
 
+/* The single USB connector is OTG: the ID pin (usb0_id_pins_a)
+ * decides the role. imx28-brain.dtsi forces dr_mode = "host",
+ * which makes every gadget function (USB networking, HID deck,
+ * mass-storage share) impossible; with "otg" the port serves as
+ * host for USB storage / Wi-Fi dongles with an OTG adapter and
+ * as a device for gadgets otherwise. PW-SH6 only for now. */
+&usb0 {
+	dr_mode = "otg";
+};
+
 &brainlcd {
 	status = "okay";
 
