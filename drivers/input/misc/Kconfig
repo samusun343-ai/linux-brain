@@ -35,7 +35,6 @@ config INPUT_88PM80X_ONKEY
 
 config INPUT_MXS_PSWITCH
 	tristate "i.MX28 PSWITCH power button"
-	depends on MFD_SYSCON
 	depends on ARCH_MXS || COMPILE_TEST
 	help
 	  Say Y here if you want to support the power button connected

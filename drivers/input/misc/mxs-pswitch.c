@@ -13,10 +13,11 @@
  */
 
 #include <linux/input.h>
+#include <linux/io.h>
 #include <linux/module.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/platform_device.h>
-#include <linux/regmap.h>
 
 #define HW_POWER_STS		0x0c0
 #define POWER_STS_PSWITCH_MASK	(0x3 << 20)
@@ -24,7 +25,7 @@
 
 struct mxs_pswitch {
 	struct input_dev *input;
-	struct regmap *regmap;
+	void __iomem *base;
 	unsigned int idle;
 	bool pressed;
 };
@@ -33,12 +34,8 @@ static void mxs_pswitch_poll(struct input_dev *input)
 {
 	struct mxs_pswitch *sw = input_get_drvdata(input);
 	unsigned int sts, level;
-	int err;
 
-	err = regmap_read(sw->regmap, HW_POWER_STS, &sts);
-	if (err)
-		return;
-
+	sts = readl(sw->base + HW_POWER_STS);
 	level = (sts & POWER_STS_PSWITCH_MASK) >> POWER_STS_PSWITCH_SHIFT;
 	if (!sw->pressed && level != sw->idle) {
 		sw->pressed = true;
@@ -55,6 +52,7 @@ static int mxs_pswitch_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct mxs_pswitch *sw;
+	struct device_node *parent_np;
 	unsigned int sts;
 	int err;
 
@@ -62,13 +60,21 @@ static int mxs_pswitch_probe(struct platform_device *pdev)
 	if (!sw)
 		return -ENOMEM;
 
-	sw->regmap = dev_get_regmap(dev->parent, NULL);
-	if (!sw->regmap)
-		return dev_err_probe(dev, -EINVAL, "no parent regmap\n");
+	/*
+	 * The parent power node is not a syscon (the mxs power driver
+	 * does not register a regmap), so map its register block
+	 * directly. Access is read-only; of_iomap() does not request
+	 * the region, so there is no conflict with the power driver.
+	 */
+	parent_np = of_get_parent(dev->of_node);
+	if (!parent_np)
+		return -ENODEV;
+	sw->base = of_iomap(parent_np, 0);
+	of_node_put(parent_np);
+	if (!sw->base)
+		return dev_err_probe(dev, -EINVAL, "failed to map power registers\n");
 
-	err = regmap_read(sw->regmap, HW_POWER_STS, &sts);
-	if (err)
-		return dev_err_probe(dev, err, "failed to read HW_POWER_STS\n");
+	sts = readl(sw->base + HW_POWER_STS);
 	sw->idle = (sts & POWER_STS_PSWITCH_MASK) >> POWER_STS_PSWITCH_SHIFT;
 
 	sw->input = devm_input_allocate_device(dev);
