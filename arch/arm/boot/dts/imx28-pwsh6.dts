@@ -58,10 +58,10 @@
 		<0 0 KEY_V>,          /* V */
 		<0 1 KEY_H>,          /* H */
 		<0 2 KEY_Y>,          /* Y */
-		/*<0 3 Modoru>, */
+		<0 3 KEY_BACK>,       /* Modoru */
 		<0 4 KEY_C>,          /* C */
 		<0 5 KEY_D>,          /* D */
-		/* <0x01 6 Home>, */
+		<0 6 KEY_HOME>,       /* Home */
 
 		/* Bank 0x02 */
 		<1 0 KEY_M>,          /* M */
@@ -151,5 +151,14 @@
 		<1 4 KEY_LEFTCTRL>,   /* Page Up */
 
 		<6 4 KEY_LEFTALT>,    /* Switch characters */
-		<4 0 KEY_BACKSPACE>;  /* Backspace */
+		<4 0 KEY_BACKSPACE>,  /* Backspace */
+
+		/* Media controls on the (otherwise unused) symbol-layer
+		 * arrow keys: Left/Right adjust volume, Up/Down adjust
+		 * backlight brightness, Space toggles mute. */
+		<2 3 KEY_VOLUMEDOWN>,    /* Left */
+		<4 3 KEY_VOLUMEUP>,      /* Right */
+		<3 3 KEY_BRIGHTNESSUP>,  /* Up */
+		<1 3 KEY_BRIGHTNESSDOWN>,/* Down */
+		<6 3 KEY_MUTE>;          /* Space */
 };
