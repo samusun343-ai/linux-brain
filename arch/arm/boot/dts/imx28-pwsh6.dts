@@ -80,7 +80,7 @@
 		<3 1 KEY_I>,          /* I */
 		<3 2 KEY_PAGEDOWN>,   /* My Dictionary */
 		<3 3 KEY_UP>,         /* Up */
-		/*<3 4 PageDown> */
+		<3 4 KEY_SCROLLDOWN>, /* Page Down */
 		<3 5 KEY_Q>,          /* Q */
 		<3 6 KEY_ESC>,        /* Home */
 
@@ -144,6 +144,7 @@
 		<6 0 KEY_SLASH>,      /* Minus */
 
 		<1 4 KEY_LEFTCTRL>,   /* Page Up */
+		<3 4 KEY_SCROLLDOWN>, /* Page Down */
 
 		<6 4 KEY_LEFTALT>,    /* Switch characters */
 		<4 0 KEY_BACKSPACE>;  /* Backspace */
